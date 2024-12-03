@@ -1,0 +1,10 @@
+streamlit==1.32.0
+SpeechRecognition==3.10.1
+clarifai-grpc==9.11.0
+gTTS==2.5.1
+streamlit-drawable-canvas==0.9.3
+numpy==1.26.4
+scipy==1.12.0
+requests==2.31.0
+pathlib==1.0.1
+PyAudio==0.2.14

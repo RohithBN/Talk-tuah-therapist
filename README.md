@@ -23,7 +23,6 @@ Talk Tuah Therapist is a comprehensive mental health support application that co
 - **Additional Features** 🎁
   - **BrainRot Memes** 😄: Lighthearted entertainment
   - **Resources Hub** 🆘: Access to mental health resources
-  - **Gratitude Journal** 🙏: Practice daily gratitude
 
 ## 🚀 Installation
 
@@ -107,6 +106,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 For support, email: support@talktuah.com
+For Queries, dm on TalkTuahTherapist
 
 ---
 

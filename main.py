@@ -19,7 +19,7 @@ from pathlib import Path
 
 
 # Constants
-PAT = 'aca1f67c23dd450b8b9306882d849a76'
+PAT = 'c50e0fac59ce46aeb7991be5253b7bd4'
 USER_ID = 'anthropic'
 APP_ID = 'completion'
 MODEL_ID = 'claude-3-opus'
@@ -66,38 +66,57 @@ def generate_response(user_message):
     stub = service_pb2_grpc.V2Stub(channel)
     metadata = (('authorization', 'Key ' + PAT),)
     userDataObject = resources_pb2.UserAppIDSet(user_id=USER_ID, app_id=APP_ID)
-
+    
     try:
+        # Explicitly specify English language in the prompt
+        prompt = f"""Answer as a mental health therapist in English language only. Reply within 100 words. 
+        Answer only mental health related questions, if not reply 'I cannot answer that question'.
+        User message: {user_message}"""
+        
         response = stub.PostModelOutputs(
             service_pb2.PostModelOutputsRequest(
                 user_app_id=userDataObject,
                 model_id=MODEL_ID,
                 version_id=MODEL_VERSION_ID,
                 inputs=[resources_pb2.Input(data=resources_pb2.Data(
-                    text=resources_pb2.Text(raw=user_message)))]
+                    text=resources_pb2.Text(raw=prompt)))]
             ),
             metadata=metadata
         )
-
+        
         if response.status.code != status_code_pb2.SUCCESS:
             raise Exception(f"API call failed: {response.status.description}")
-
-        return response.outputs[0].data.text.raw
+            
+        if not response.outputs:
+            raise Exception("No output received from the model")
+            
+        # Ensure the response is in English
+        response_text = response.outputs[0].data.text.raw
+        
+        return response_text
+        
     except Exception as e:
         st.error(f"Error generating response: {e}")
-        return None
-
-
+        print(f"Detailed error: {str(e)}")
+        return "I apologize, but I'm having trouble processing your request at the moment. Please try again."
 def record_and_transcribe():
     recognizer = sr.Recognizer()
+    
     try:
         with sr.Microphone() as source:
+            # Adjust for ambient noise
             with st.spinner("Adjusting for ambient noise..."):
-                recognizer.adjust_for_ambient_noise(source)
-
+                recognizer.adjust_for_ambient_noise(source, duration=1)
+            
             st.info("🎤 Listening... Please speak now.")
-            audio_data = recognizer.listen(source, timeout=5)
-
+            
+            # Configure listen parameters for dynamic listening
+            audio_data = recognizer.listen(
+                source,
+                timeout=None,  # No timeout for initial phrase
+                phrase_time_limit=None  # No limit on phrase duration
+            )
+            
             with st.spinner("Transcribing..."):
                 try:
                     transcription = recognizer.recognize_google(audio_data)
@@ -108,6 +127,7 @@ def record_and_transcribe():
                     st.error("Could not connect to speech recognition service.")
     except Exception as e:
         st.error(f"Error accessing microphone: {e}")
+    
     return None
 
 
@@ -122,6 +142,8 @@ def speak(text):
         return None
 
 
+
+
 def chatbot_page():
     st.header("💭 Chat with Me")
     
@@ -131,7 +153,7 @@ def chatbot_page():
     
     # Input methods
     st.write("### Choose Input Method")
-    input_method = st.radio("", ["Text Input", "Voice Recording"])
+    input_method = st.radio("", ["Text Input", "Voice Recording (5-10 seconds recommended)"])
     
     if input_method == "Text Input":
         # Text input option
@@ -299,8 +321,8 @@ def game_center_page():
 
 def breathing_center_page():
     st.header("🫁 Breathing Center")
-
-    # Custom CSS for animations
+    
+    # Enhanced Custom CSS for better UI
     st.markdown("""
         <style>
         @keyframes breathe {
@@ -309,88 +331,123 @@ def breathing_center_page():
             100% { transform: scale(1); opacity: 0.3; }
         }
         .breathing-circle {
-            width: 100px;
-            height: 100px;
+            width: 150px;
+            height: 150px;
             background: radial-gradient(circle, #236860, #2E7D32);
             border-radius: 50%;
-            margin: 20px auto;
+            margin: 40px auto;
             animation: breathe 8s infinite ease-in-out;
-            
+            box-shadow: 0 0 30px rgba(46, 125, 50, 0.3);
         }
         .exercise-card {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 20px;
-            margin: 10px 0;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            color:black;
+            background: linear-gradient(to right bottom, #ffffff, #f8f9fa);
+            border-radius: 20px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            color: #1a1a1a;
+            border: 1px solid rgba(46, 125, 50, 0.1);
         }
         .timer-text {
-            font-size: 2em;
+            font-size: 3em;
             font-weight: bold;
             text-align: center;
             color: #2E7D32;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        div[data-testid="stSelectbox"] {
+            width: 100%;
+        }
+        .stButton > button {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin: 10px 0;
         }
         </style>
     """, unsafe_allow_html=True)
-
-    # Display breathing animation
-    st.markdown('<div class="breathing-circle"></div>', unsafe_allow_html=True)
-
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        breathing_exercise = st.selectbox(
-            "Select a breathing exercise:",
-            ["Box Breathing", "4-7-8 Breathing", "Deep Breathing"]
-        )
-
-    # Exercise descriptions
-    descriptions = {
-        "Box Breathing": "Box breathing is a powerful stress-relief technique used by Navy SEALs.",
-        "4-7-8 Breathing": "This technique helps reduce anxiety and aids better sleep.",
-        "Deep Breathing": "Simple yet effective way to reduce stress and increase mindfulness."
-    }
-
-    st.markdown(
-        f'<div class="exercise-card">{descriptions[breathing_exercise]}</div>', unsafe_allow_html=True)
-
-    if st.button("Start Exercise", key="start_breathing"):
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-
-        if breathing_exercise == "Box Breathing":
-            for cycle in range(4):
-                for phase, duration in [("Inhale", 4), ("Hold", 4), ("Exhale", 4), ("Hold", 4)]:
-                    status_text.markdown(
-                        f'<p class="timer-text">{phase}</p>', unsafe_allow_html=True)
-                    for i in range(duration):
-                        progress_bar.progress((i + 1) / duration)
-                        time.sleep(1)
-                    progress_bar.progress(0)
-
-        elif breathing_exercise == "4-7-8 Breathing":
-            for cycle in range(4):
-                for phase, duration in [("Inhale", 4), ("Hold", 7), ("Exhale", 8)]:
-                    status_text.markdown(
-                        f'<p class="timer-text">{phase}</p>', unsafe_allow_html=True)
-                    for i in range(duration):
-                        progress_bar.progress((i + 1) / duration)
-                        time.sleep(1)
-                    progress_bar.progress(0)
-
-        elif breathing_exercise == "Deep Breathing":
-            for cycle in range(4):
-                for phase, duration in [("Inhale Deeply", 4), ("Hold", 2), ("Exhale Slowly", 4), ("Rest", 2)]:
-                    status_text.markdown(
-                        f'<p class="timer-text">{phase}</p>', unsafe_allow_html=True)
-                    for i in range(duration):
-                        progress_bar.progress((i + 1) / duration)
-                        time.sleep(1)
-                    progress_bar.progress(0)
-
-        st.success("Exercise completed! Take a moment to notice how you feel.")
-
-
+    
+    # Container for better spacing
+    container = st.container()
+    
+    with container:
+        # Display breathing animation
+        st.markdown('<div class="breathing-circle"></div>', unsafe_allow_html=True)
+        
+        # Create a wider layout
+        col1, col2, col3 = st.columns([1, 3, 1])
+        
+        with col2:
+            breathing_exercise = st.selectbox(
+                "Select a breathing exercise:",
+                ["Box Breathing", "4-7-8 Breathing", "Deep Breathing"],
+                key="breathing_select"
+            )
+            
+            # Enhanced exercise descriptions
+            descriptions = {
+                "Box Breathing": """🔲 Box breathing is a powerful stress-relief technique used by Navy SEALs. 
+                Perfect for maintaining calm and focus under pressure.""",
+                "4-7-8 Breathing": """🌙 The 4-7-8 breathing technique helps reduce anxiety and aids better sleep. 
+                Practiced twice daily, it becomes more effective over time.""",
+                "Deep Breathing": """🌊 Deep breathing is a simple yet effective way to reduce stress and increase mindfulness. 
+                It helps activate your body's natural relaxation response."""
+            }
+            
+            st.markdown(
+                f'<div class="exercise-card">{descriptions[breathing_exercise]}</div>', 
+                unsafe_allow_html=True
+            )
+            
+            # Controls section
+            controls_col1, controls_col2 = st.columns([2, 2])
+            with controls_col1:
+                start_button = st.button("Start Exercise 🎯", key="start_breathing", use_container_width=True)
+            with controls_col2:
+                play_music = st.checkbox("🎵 Play Meditation Music", key="play_music")
+                
+            if play_music:
+                audio_file = open('assets/audio/meditation.mp3', 'rb')
+                audio_bytes = audio_file.read()
+                st.audio(audio_bytes, format='audio/mp3')
+            
+            if start_button:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                if breathing_exercise == "Box Breathing":
+                    for cycle in range(4):
+                        for phase, duration in [("Inhale", 4), ("Hold", 4), ("Exhale", 4), ("Hold", 4)]:
+                            status_text.markdown(
+                                f'<p class="timer-text">{phase}</p>', unsafe_allow_html=True)
+                            for i in range(duration):
+                                progress_bar.progress((i + 1) / duration)
+                                time.sleep(1)
+                            progress_bar.progress(0)
+                            
+                elif breathing_exercise == "4-7-8 Breathing":
+                    for cycle in range(4):
+                        for phase, duration in [("Inhale", 4), ("Hold", 7), ("Exhale", 8)]:
+                            status_text.markdown(
+                                f'<p class="timer-text">{phase}</p>', unsafe_allow_html=True)
+                            for i in range(duration):
+                                progress_bar.progress((i + 1) / duration)
+                                time.sleep(1)
+                            progress_bar.progress(0)
+                            
+                elif breathing_exercise == "Deep Breathing":
+                    for cycle in range(4):
+                        for phase, duration in [("Inhale Deeply", 4), ("Hold", 2), ("Exhale Slowly", 4), ("Rest", 2)]:
+                            status_text.markdown(
+                                f'<p class="timer-text">{phase}</p>', unsafe_allow_html=True)
+                            for i in range(duration):
+                                progress_bar.progress((i + 1) / duration)
+                                time.sleep(1)
+                            progress_bar.progress(0)
+                            
+                st.success("✨ Exercise completed! Take a moment to notice how you feel.")
 
 def journal_page():
     st.title("📝 Personal Journal")
@@ -647,7 +704,7 @@ def sleep_tracker_page():
         
         factors = st.multiselect(
             "Factors affecting sleep:",
-            ["Stress", "Exercise", "Caffeine", "Screen Time", "Noise", "Temperature"]
+            ["Stress", "Exercise", "Caffeine", "Screen Time", "Noise", "Temperature","ECE Department"]
         )
     
     if st.button("Save Sleep Log"):
@@ -910,8 +967,6 @@ def therapeutic_activities_page():
 
     
 
-
-
 def main():
     init_styles()
 
@@ -926,9 +981,9 @@ def main():
         st.title("Talk Tuah Therapist")
         st.markdown("*Your Safe Space for Healing: Chat, Journal, Grow.*")
     tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-        "Chatbot", "Breathing Center", "Journal Center",
-        "Sleep Tracker", "Mood Tracker", "Stress Burster", 
-        "Game Center", "BrainRot Memes", "Therapeutic Activities"
+        "Chatbot", "Breathing Center", "Therapeutic Activities",
+        "Sleep Tracker", "Mood Tracker", "Journal Center", 
+        "BrainRot Memes", "Stress Buster", "Game Center"
     ])
 
     with tab1:
@@ -936,19 +991,19 @@ def main():
     with tab2:
         breathing_center_page()
     with tab3:
-        journal_page()
+        therapeutic_activities_page()
     with tab4:
         sleep_tracker_page()
     with tab5:  
         mood_tracker_page()
     with tab6:
-        stress_burster()
+        journal_page()
     with tab7:
-        game_center_page()
-    with tab8:
         brainrot_corner_page()
+    with tab8:
+        stress_burster()
     with tab9:
-        therapeutic_activities_page()
+        game_center_page()
 
 
     # Add Resources section in sidebar
@@ -958,8 +1013,10 @@ def main():
             resources_page()
 
     st.markdown("""
-    <hr>
-    <p style='text-align: center; color: #888;'>Created with ❤ for mental health awareness</p>
-    """, unsafe_allow_html=True)
+Created with ❤ for mental health awareness
+
+For support, email: talktuahtherapist03@gmail.com  
+For Queries, dm on <a href="https://www.instagram.com/talktuahtherapist">TalkTuahTherapist</a>
+""", unsafe_allow_html=True)
 if __name__=="__main__":
         main()
